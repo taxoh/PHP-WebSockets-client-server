@@ -7,7 +7,7 @@
 	
 	Пример:
 	
-		$client = new WebSocketClient("ws://localhost:1122", 10);
+		$client = new WebSocketClient("ws://localhost:1122");
 		$client->send('some shit');
 		$arr = $client->recv();
 		foreach ($arr as $a)
