@@ -1,22 +1,70 @@
-# PHP-webSocketsClient
-WebSockets Client written in PHP 7
+WebSocket клиент/сервер без зависимостей.
 
-WebSocket-клиент без зависимостей
-
-	Реализует версию протокола #13 (RFC 6455).
-	Обрабатывает хендшейки, маскирование, фрагментацию, control-фреймы (пинги, close'ы).
+	Соответствует протоколу, описанному в RFC 6455.
+	Поддерживает хендшейки, маскирование, фрагментацию, control-фреймы (пинги, close'ы), TLS.
 	Не накладывает каких-либо ограничений на маскировку фреймов.
-	Поддерживает почти все возможности протокола, можно еще SSL прикрутить при желании.
+	Поддерживаются практически все возможности протокола.
+	Не поддерживаются расширения и субпротоколы.
 	
-Пример:
+	Клиент WebSockets.
 	
-	$client = new WebSocketClient("ws://localhost:1122");
-	$client->send('some shit');
-	$arr = $client->recv();
-	foreach ($arr as $a)
-	{echo $a['payload'].'==========='."\n";}
+		При ошибках соединения выбрасывает исключение.
+		У клиента имеется встроенный механизм обнаружения повисших соединений.
+		Если длительное время данных не приходит, то выбрасывается исключение и соединение закрывается.
+		Это позволяет обнаружить и обработать (штатную для TCP) ситуацию зависания подключения, когда удаленный сервер внезапно пропал без ответа.
+		Поэтому когда долгое время (stall_time/2) нет данных, то делается поддержание активности в канале. По-умолчанию это пинги в виде control-frame.
+		Сервер может не поддерживать ping control-frames (хотя обязан). В таких случаях вы можете пронаследовать класс и перекрыть функцию make_activity(), выполнив вместо пинга что-то другое. 
+		
+		Пример:
+		
+			$ws = new WebSocketClient();
+			$ws->connect("ws://localhost:1122/some/url");
+			$ws->send('some shit');
+			$arr = $ws->recv();
+			foreach ($arr as $a)
+			{echo $a['payload'].'==========='."\n";}
+		
+	Сервер WebSockets.
 	
-Ссылки:
+		При ошибках клиентов исключения не выбрасываются - вместо этого вызывается соответствующий колбек.
+		Все клиенты обрабатываются в одном потоке (любой "медленный" клиент способен заставить ждать весь сервер!), поэтому имеется уязвимость типа "DoS".
+		В глобальную сеть, конечно, не повесишь, а вот локально - вполне применимый.
+		Неявно склеивает фрагментированные фреймы. При получении гигантских фрагментированных пакетов (несколько сотен Мб) может просто исчерпаться память, и это, опять же, DoS.
+		Сервер не поддерживает TLS соединения.
+		
 	
-	https://tools.ietf.org/html/rfc6455
-	https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers	
+		Пример:
+		
+			$s = new WebSocketServer();
+			$s->on_receive = function($cl,$f)use($s){
+			  echo 'client #'.$cl['id'].' says:';
+			  var_dump($f);
+			  echo "\n";
+			  $s->send($cl, 'Thank you!', 'text', false);
+			};
+			$s->on_connect = function($cl){
+			  echo 'client #'.$cl['id'].' connected to "'.$cl['url'].'"'."\n";
+			};
+			$s->on_error = function($cl,$err){
+			  echo 'client #'.$cl['id'].' error: '.$err."\n";
+			};
+			$s->start('localhost', 36000);
+			
+			// цикл не обязателен - можно проверять довольно редко, с любыми интервалами
+			while (true)
+			{
+				$s->check_messages();
+				usleep(50000);
+			}
+				
+		Потестить сервер можно через плагины Chrome или Firefox: 
+		
+			Simple Web Socket Client
+			Smart Websocket Client
+			и др.
+	
+	Ссылки:
+	
+		https://tools.ietf.org/html/rfc6455
+		https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_client_applications
+		https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers	
