@@ -105,7 +105,7 @@ class WebSocketClient extends WebSocketBase
 		$x = mt_rand(0,3);
 		for ($i=1;$i<=10+$x;$i++) $key .= chr(mt_rand(0,255));
 		$key = base64_encode($key);
-		$head = "GET ".$path." HTTP/1.1"."\r\n".
+		$head = "GET ".$path."?".$query." HTTP/1.1"."\r\n".
 				"Host: ".$host."\r\n".
 				"Upgrade: WebSocket"."\r\n".
 				"Connection: Upgrade"."\r\n".
